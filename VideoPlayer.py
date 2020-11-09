@@ -5,9 +5,9 @@ import cv2
 import queue
 import base64
 
+
 mutex = threading.Lock()
 class threadedQueue():
-    
     def __init__(self):
         self.semaphore = threading.Semaphore(10) #10 the given capacity
         self.queue = queue.Queue()
@@ -19,7 +19,7 @@ class threadedQueue():
         mutex.release()
     #retrieve image from queue
     def get(self):
-        self.semaphore.release()
+        self.semaphore.release()#increases total by 1
         mutex.acquire()
         frame = self.queue.get()
         mutex.release()
@@ -38,8 +38,8 @@ filename = 'clip.mp4'
 c = cv2.VideoCapture(filename)
 total = int(c.get(cv2.CAP_PROP_FRAME_COUNT))-1
 
-
-def extractFrames(fileName = 'clip.mp4', maxFramesToLoad=9999):
+#gets frames and enqueues them into queueOne
+def extractFrames(fileName = 'clip.mp4'):
     # Initialize frame count
     count = 0
     # open video file
@@ -53,40 +53,37 @@ def extractFrames(fileName = 'clip.mp4', maxFramesToLoad=9999):
         count +=1
         success,image = vidcap.read()
         print(f'Reading frame {count} {success}')
-         
     print('Frame extraction complete')
-    #queueOne.put('end')
     
-
+#dequeues frames from queueOne, grasycales frame and enqueues them into queueTwo
 def convertToGrayscale():
     count = 0
     while True:
+        #wait
         if queueOne.isEmpty():
             continue
         getting = queueOne.get()
         #if last frame was already processed, leave
         if count == total:
-            break
-         
+            # count+=1
+            print(f'Converting last frame {count}')
+            break  
         #convert to grayscale
         grayScaleFrame = cv2.cvtColor(getting, cv2.COLOR_BGR2GRAY)
-
         queueTwo.put(grayScaleFrame)
         print(f'Converting frame {count}')
         count +=1
-    
-    
-
-
+        
+#dequeues from queueTwo and displays frames
 def displayFrames():
-
     #initialize frame count
     count = 0
- 
     while True:
         #my take on the flag
         if count == total:
+            print(f'Displaying last frame {count}')
             break
+        #wait
         if queueTwo.isEmpty():
             continue
         # get the next frame
@@ -94,20 +91,19 @@ def displayFrames():
         print(f'Displaying frame {count}')
         # display the image in a window called "video" and wait 42ms
         # before displaying the next frame
-
         cv2.imshow('Video', frame)
-
         if cv2.waitKey(42) and 0xFF == ord("q"):
             break
-        count += 1
-                
+        count += 1              
     print('Finished displaying all frames')
     # cleanup the windows
     cv2.destroyAllWindows()
-    
+
+#each method is a thread    
 threadOne = threading.Thread(target= extractFrames)
 threadTwo = threading.Thread(target = convertToGrayscale)
 threadThree = threading.Thread(target = displayFrames)
 threadOne.start()
 threadTwo.start()
 threadThree.start()
+
